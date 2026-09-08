@@ -32,7 +32,8 @@ GitHub Actions → OIDC 임시 자격증명 → CLI 빌드·S3 업로드·메타
 
 서버에서 HTTPS 상태 확인 200, 미인증 콘솔 401, 공개 관리 API 404를 확인했습니다.
 인증 후 콘솔은 200으로 열렸고 브라우저 JavaScript 오류가 없었으며 두 컨테이너는 healthy 상태였습니다.
-GitHub 전송 검증의 성공 여부는 개별 Actions 실행 결과로 확인합니다.
+2026-09-08 [GitHub Actions 실행](https://github.com/CheolMinBae/hot-updater-lab/actions/runs/34209800998)이 성공했습니다. OIDC 인증, S3 배포, 1,079바이트 번들 다운로드와 SHA-256, 버전·채널 분리 검증이 통과했습니다.
+브라우저 콘솔에서 번들 비활성화 → API `ROLLBACK` → 재활성화 → 정상 업데이트 제공도 확인했습니다. 테스트 번들은 활성 상태로 복원했습니다.
 
 ## 로컬 개발과 수동 전송 검증
 
