@@ -2,6 +2,13 @@ name: OTA transport fixture
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'fixtures/**'
+      - 'scripts/fixture-build.ts'
+      - 'hot-updater.config.ts'
+      - '.github/workflows/ota.yml'
 
 permissions:
   contents: read
