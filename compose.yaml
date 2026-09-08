@@ -1,0 +1,50 @@
+name: hot-updater-lab
+services:
+  console:
+    build: .
+    image: hot-updater-lab:0.36.11
+    command: ["npm", "run", "console"]
+    init: true
+    restart: unless-stopped
+    environment:
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:?S3_BUCKET_NAME is required}
+      AWS_REGION: ap-northeast-2
+      NITRO_HOST: 0.0.0.0
+      NITRO_PORT: "1422"
+      PORT: "1422"
+      NODE_ENV: production
+    ports:
+      - "127.0.0.1:1422:1422"
+    mem_limit: 768m
+    cpus: 1.0
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "2" }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:1422').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+  api:
+    image: hot-updater-lab:0.36.11
+    command: ["npm", "start"]
+    init: true
+    restart: unless-stopped
+    environment:
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:?S3_BUCKET_NAME is required}
+      AWS_REGION: ap-northeast-2
+      PORT: "3007"
+      NODE_ENV: production
+    ports:
+      - "127.0.0.1:3007:3007"
+    mem_limit: 384m
+    cpus: 0.5
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "2" }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3007/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

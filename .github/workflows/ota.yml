@@ -1,0 +1,41 @@
+name: OTA transport fixture
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: ota-lab-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      AWS_REGION: ap-northeast-2
+      S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
+      OTA_BASE_URL: ${{ vars.OTA_BASE_URL }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - uses: aws-actions/configure-aws-credentials@v6.2.4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ap-northeast-2
+          role-session-name: ota-lab-${{ github.run_id }}
+      - name: Publish diagnostic fixture (not a React Native app)
+        id: deploy
+        run: npx hot-updater deploy -p android -c lab -t 1.0.0 -m 'CI transport fixture'
+      - name: Verify deployed OTA transport and access boundaries
+        env:
+          OTA_EXPECTED_BUNDLE_ID: ${{ steps.deploy.outputs.bundle_id }}
+        run: npx tsx scripts/smoke.ts
