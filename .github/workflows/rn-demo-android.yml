@@ -1,0 +1,127 @@
+name: RN demo Android build and SDK smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_run_id:
+        description: 'Reuse ota-demo-android-apk from an earlier run (required when testing a newer OTA)'
+        required: false
+        type: string
+      expected_ota_label:
+        description: 'Download and apply OTA, then assert this label (for example OTA v2); empty checks the baseline only'
+        required: false
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - 'apps/ota-demo/android/**'
+      - 'apps/ota-demo/package.json'
+      - 'apps/ota-demo/package-lock.json'
+      - 'apps/ota-demo/index.js'
+      - 'apps/ota-demo/app.json'
+      - 'apps/ota-demo/babel.config.js'
+      - 'apps/ota-demo/metro.config.js'
+      - 'apps/ota-demo/tsconfig.json'
+      - 'apps/ota-demo/scripts/**'
+      - 'apps/ota-demo/e2e/**'
+      - '.github/workflows/rn-demo-android.yml'
+
+# This workflow builds and exercises a public client. It cannot assume the AWS deployment role.
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: rn-demo-android-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/ota-demo
+    env:
+      EXPECTED_OTA_LABEL: ${{ inputs.expected_ota_label || '' }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Validate the OTA test inputs
+        env:
+          APK_RUN_ID: ${{ inputs.apk_run_id || '' }}
+        run: |
+          python3 - <<'PY'
+          import os
+          run_id = os.environ['APK_RUN_ID']
+          if run_id and not run_id.isdigit():
+              raise SystemExit('apk_run_id must be a numeric GitHub Actions run ID')
+          if os.environ['EXPECTED_OTA_LABEL'] and not run_id:
+              raise SystemExit('Set apk_run_id to the APK build that finished before this OTA was published')
+          PY
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/ota-demo/package-lock.json
+      - uses: actions/setup-java@v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: |
+            apps/ota-demo/android/**/*.gradle*
+            apps/ota-demo/android/gradle/wrapper/gradle-wrapper.properties
+            apps/ota-demo/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test -- --runInBand
+      - name: Install native build dependencies
+        if: ${{ !inputs.apk_run_id }}
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.1.12297006' 'cmake;3.22.1'
+      - name: Build release APK with the demo signing key
+        if: ${{ !inputs.apk_run_id }}
+        run: npm run android:release -- --no-daemon -PreactNativeArchitectures=arm64-v8a,x86_64
+      - name: Save the original APK for installation and later OTA checks
+        if: ${{ !inputs.apk_run_id }}
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: ota-demo-android-apk
+          path: apps/ota-demo/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+      - name: Reuse the APK built before the OTA was published
+        if: ${{ inputs.apk_run_id }}
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: ota-demo-android-apk
+          run-id: ${{ inputs.apk_run_id }}
+          github-token: ${{ github.token }}
+          path: apps/ota-demo/android/app/build/outputs/apk/release
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Exercise the installed app through its SDK controls
+        # reactivecircus/android-emulator-runner v2.38.0, pinned to its release commit.
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7_pro
+          ram-size: 2048M
+          emulator-boot-timeout: 300
+          disable-animations: true
+          working-directory: apps/ota-demo
+          script: python3 e2e/android_smoke.py --apk android/app/build/outputs/apk/release/app-release.apk --expected-ota-label "$EXPECTED_OTA_LABEL"
+      - name: Save screenshots, UI hierarchy, result and logcat
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: ota-demo-android-evidence
+          path: apps/ota-demo/e2e/artifacts/
+          if-no-files-found: warn
+          retention-days: 14

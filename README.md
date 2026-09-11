@@ -1,7 +1,16 @@
 # Hot Updater 실험 서버
 
 Hot Updater **0.36.11** 콘솔과 OTA 확인 API를 기존 EC2에서 Docker로 운영하는 실험 환경입니다.
-현재 배포 대상은 전송 경로를 검증하는 작은 JavaScript fixture입니다. **실제 React Native 앱이나 기기의 OTA 적용을 검증한 구성은 아닙니다.**
+실제 RN 클라이언트는 [apps/ota-demo](apps/ota-demo/README.md)에 있습니다. Android·iOS 네이티브 SDK와 업데이트 확인·다운로드·재시작 화면을 포함합니다.
+기존 `lab` 채널의 JavaScript fixture는 전송 진단용이며, RN 앱은 별도의 `rn-demo` 채널을 사용합니다.
+
+## RN 앱 빠른 테스트
+
+1. **RN demo Android build and SDK smoke** Actions에서 Release APK를 받습니다.
+2. 앱 설치 후 `apps/ota-demo/src/release.ts`의 문구·색상 또는 `App.tsx`를 수정해 main에 push합니다.
+3. **RN demo OTA deploy** 완료 후 앱에서 확인 → 다운로드 → 적용 버튼을 누릅니다.
+
+APK를 먼저 빌드하고 그 이후 OTA를 배포해야 합니다. 같은 APK로 계속 테스트하며, 자세한 설정과 검증 방법은 [RN 앱 안내](apps/ota-demo/README.md)를 참고하세요.
 
 ## 접속과 구성
 

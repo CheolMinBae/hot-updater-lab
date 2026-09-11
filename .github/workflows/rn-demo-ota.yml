@@ -1,0 +1,56 @@
+name: RN demo OTA deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform of the already installed native app'
+        type: choice
+        options: [android, ios]
+        default: android
+  push:
+    branches: [main]
+    paths:
+      - 'apps/ota-demo/App.tsx'
+      - 'apps/ota-demo/src/**'
+      - 'apps/ota-demo/hot-updater.config.ts'
+
+permissions:
+  contents: read
+  id-token: write
+
+# S3 metadata is shared with the original diagnostic fixture workflow.
+concurrency:
+  group: ota-lab-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/ota-demo
+    env:
+      AWS_REGION: ap-northeast-2
+      S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
+      OTA_PLATFORM: ${{ inputs.platform || 'android' }}
+      DEPLOY_COMMIT: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/ota-demo/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test -- --runInBand
+      - uses: aws-actions/configure-aws-credentials@v6.2.4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ap-northeast-2
+          role-session-name: rn-demo-${{ github.run_id }}
+      - name: Build Hermes bundle and publish through Hot Updater
+        run: npx hot-updater deploy -p "$OTA_PLATFORM" -c rn-demo -t 1.0.0 -m "RN demo $DEPLOY_COMMIT" -o dist
