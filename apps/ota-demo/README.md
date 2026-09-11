@@ -76,3 +76,13 @@ OTA 배포 후 같은 workflow를 `apk_run_id=<원래 APK 빌드 run ID>`, `expe
 자세한 실행 방법은 [E2E 안내](e2e/README.md)를 참고하세요.
 
 현재 데모는 개인 테스트 서버와 연결합니다. iOS 실행/서명 및 번들 서명 검증은 Android 검증과 별개입니다.
+
+### 2026-09-11 검증 결과
+
+- [첫 APK 빌드 및 SDK 확인 성공](https://github.com/CheolMinBae/hot-updater-lab/actions/runs/34563148929): 이 run의 `ota-demo-android-apk`가 `Baseline v1` 설치 파일입니다.
+- [OTA v2 배포 성공](https://github.com/CheolMinBae/hot-updater-lab/actions/runs/34563564691): 번들 ID `01a08ecb-e322-72db-ba12-7fd7c088401c`.
+- [동일 APK의 OTA 적용·재실행 유지 검증 성공](https://github.com/CheolMinBae/hot-updater-lab/actions/runs/34564057641): SDK 확인 → 다운로드 → 재시작 → `OTA v2` 표시 → 종료/재실행 후 `OTA v2` 유지.
+- Android 15 / API 35 에뮬레이터에서 검증했습니다. iOS 네이티브 실행, 서명 검증, 장애 롤백은 이번 검증 범위에 포함하지 않습니다.
+- APK SHA-256: `0ff994263c7e630ef3841c33b6c69884b98dcc91d5abf17ae581493129c404f3`.
+
+현재 소스는 `OTA v2` 화면입니다. OTA 전후 비교를 바로 하려면 위 첫 빌드의 APK를 설치하세요. Actions 아티팩트 보존 기간은 14일입니다.

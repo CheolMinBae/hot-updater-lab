@@ -2,7 +2,7 @@
 
 The GitHub Actions workflow **RN demo Android build and SDK smoke** builds a demo-signed release APK and installs it in an Android 15 / API 35 emulator. No Metro server is involved.
 
-The initial run checks `Baseline v1` and presses **Check for update**. The `ota-demo-android-apk` artifact is the installable APK. Keep its run ID: the Hot Updater native build records a minimum bundle ID, so an OTA published before a freshly rebuilt APK may be ineligible.
+The initial run detects the APK's embedded release label (the first demo APK shows `Baseline v1`) and presses **Check for update**. The `ota-demo-android-apk` artifact is the installable APK. Keep its run ID: the Hot Updater native build records a minimum bundle ID, so an OTA published before a freshly rebuilt APK may be ineligible.
 
 To verify an OTA end to end:
 
@@ -25,3 +25,5 @@ python3 e2e/android_smoke.py \
 Omit the expected label for the initial check. `ANDROID_SERIAL` can select a different emulator or a dedicated test device. The script clears this demo application's data before testing.
 
 The workflow has only repository/content read permissions and does not deploy bundles or receive AWS credentials. The APK uses the standard React Native demo/debug signing key, not a production signing identity. This test covers the explicit SDK update path and persistence; it does not claim iOS, rollout-cohort, signature, or crash-rollback coverage.
+
+CI uses a Pixel 2 profile, 3 GB RAM and a 20-second boot settling period. Any Android ANR dialog fails the test explicitly. Changes limited to the E2E script/workflow are tested with a manual run using an existing APK; they do not automatically create a new native baseline.
