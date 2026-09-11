@@ -77,19 +77,20 @@ npm run ios:simulator
 
 ## 화면 수정 → OTA 배포
 
-1. 먼저 APK를 빌드해 기기에 설치합니다.
+1. 먼저 Android APK 또는 iOS 시뮬레이터 앱을 빌드해 설치합니다.
 2. `src/release.ts`의 `label`, `message`, `accent` 또는 `App.tsx`의 화면을 바꿉니다.
-3. `main`에 해당 변경을 push하면 **RN demo OTA deploy**가 Android 번들을 빌드해 S3에 등록합니다.
+3. `main`에 해당 변경을 push하면 **RN demo OTA deploy**가 Android와 iOS 번들을 각각 빌드해 S3에 순서대로 등록합니다.
 4. 앱에서 확인 → 다운로드 → 적용 버튼을 누르면 화면이 바뀝니다. 네이티브 앱 버전 `1.0.0`은 그대로입니다.
 
 배포 workflow는 저장소의 기존 `AWS_ROLE_ARN`, `S3_BUCKET_NAME` 변수를 사용해 GitHub OIDC로 인증합니다.
 콘솔에서 `rn-demo` 채널로 필터링하면 이 앱의 번들을 확인할 수 있습니다.
-iOS는 해당 플랫폼의 네이티브 앱을 먼저 설치한 후 **RN demo OTA deploy** (`rn-demo-ota.yml`)에서 `platform=ios`, branch `main`으로 수동 실행합니다.
-CLI로는 다음과 같습니다. 소스 push에 의한 자동 배포는 Android만 대상으로 합니다.
+GitHub 웹 편집기에서 수정해도 `main`에 커밋되면 두 플랫폼이 자동 배포됩니다. 자동 배포 대상 경로는 `App.tsx`, `src/`, `index.js`, `assets/`, `hot-updater.config.ts` 및 배포 workflow입니다.
+수동으로 다시 배포할 때는 **RN demo OTA deploy** (`rn-demo-ota.yml`)에서 branch `main`, `platform=both`를 선택합니다. 기본값도 `both`이며, 한 플랫폼만 배포하려면 `android` 또는 `ios`를 선택할 수 있습니다.
+두 플랫폼은 동일 커밋으로 배포되며, 공유 S3 메타데이터의 동시 수정을 피하도록 순서대로 실행합니다. 한쪽 배포가 실패하면 Actions에서 실패한 단계를 확인하세요. 두 배포가 원자적으로 함께 취소되는 구조는 아닙니다.
 
 ```sh
 gh workflow run rn-demo-ota.yml --ref main \
-  --repo CheolMinBae/hot-updater-lab -f platform=ios
+  --repo CheolMinBae/hot-updater-lab -f platform=both
 ```
 
 로컬 CLI 배포도 가능합니다. `.env.example`을 참고해 버킷/리전을 설정하고 AWS 프로필 또는 역할로 인증합니다.

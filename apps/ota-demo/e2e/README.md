@@ -40,7 +40,7 @@ Verified on 2026-09-11: [baseline build and SDK check](https://github.com/CheolM
 
 1. Run `rn-demo-ios.yml` on `main` with both `app_run_id` and `expected_ota_label` empty. The workflow builds an embedded `Baseline v1` using `IOS_BASELINE_LABEL` and runs the initial SDK check.
 2. Keep that run ID and the `ota-demo-ios-simulator` artifact. It contains `OtaDemo-simulator-arm64.tar.gz` and `SHA256SUMS.txt`; the tar archive preserves the `.app` bundle's permissions and symlinks.
-3. After the baseline build finishes, publish an iOS bundle with a different visible release label through **RN demo OTA deploy**, selecting `platform=ios` and branch `main`. The app's normal source push workflow deploys Android only.
+3. After the baseline build finishes, publish an iOS bundle with a different visible release label through **RN demo OTA deploy**, selecting `platform=ios` and branch `main`. The normal source push workflow now publishes both Android and iOS sequentially; manual dispatch defaults to `platform=both`, while `platform=ios` remains available for an isolated iOS test.
 4. Run `rn-demo-ios.yml` again with `app_run_id` set to the original baseline run ID and `expected_ota_label` set to the exact deployed label, such as `OTA v2`.
 
 The second run downloads and verifies the original archive instead of rebuilding the app. The test asserts the baseline, check for updates, download the SDK-selected bundle, apply it, and verify the new label after reload and another app launch. An expected OTA label requires an `app_run_id`, so a test cannot accidentally prove the new screen merely by embedding it in a fresh native build.

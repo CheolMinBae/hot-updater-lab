@@ -4,16 +4,19 @@ on:
   workflow_dispatch:
     inputs:
       platform:
-        description: 'Platform of the already installed native app'
+        description: 'Platforms to publish; both updates Android and iOS'
         type: choice
-        options: [android, ios]
-        default: android
+        options: [both, android, ios]
+        default: both
   push:
     branches: [main]
     paths:
       - 'apps/ota-demo/App.tsx'
       - 'apps/ota-demo/src/**'
+      - 'apps/ota-demo/index.js'
+      - 'apps/ota-demo/assets/**'
       - 'apps/ota-demo/hot-updater.config.ts'
+      - '.github/workflows/rn-demo-ota.yml'
 
 permissions:
   contents: read
@@ -28,14 +31,14 @@ jobs:
   deploy:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: apps/ota-demo
     env:
       AWS_REGION: ap-northeast-2
       S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
-      OTA_PLATFORM: ${{ inputs.platform || 'android' }}
+      OTA_PLATFORM: ${{ inputs.platform || 'both' }}
       DEPLOY_COMMIT: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v7.0.1
@@ -52,5 +55,10 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ap-northeast-2
           role-session-name: rn-demo-${{ github.run_id }}
-      - name: Build Hermes bundle and publish through Hot Updater
-        run: npx hot-updater deploy -p "$OTA_PLATFORM" -c rn-demo -t 1.0.0 -m "RN demo $DEPLOY_COMMIT" -o dist
+      # Publish sequentially because both platforms share S3 metadata.
+      - name: Publish Android OTA
+        if: ${{ env.OTA_PLATFORM == 'both' || env.OTA_PLATFORM == 'android' }}
+        run: npx hot-updater deploy -p android -c rn-demo -t 1.0.0 -m "RN demo $DEPLOY_COMMIT" -o dist
+      - name: Publish iOS OTA
+        if: ${{ env.OTA_PLATFORM == 'both' || env.OTA_PLATFORM == 'ios' }}
+        run: npx hot-updater deploy -p ios -c rn-demo -t 1.0.0 -m "RN demo $DEPLOY_COMMIT" -o dist
