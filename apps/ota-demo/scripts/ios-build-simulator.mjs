@@ -15,10 +15,14 @@ if (!env.DEVELOPER_DIR && existsSync('/Applications/Xcode.app/Contents/Developer
   env.DEVELOPER_DIR = '/Applications/Xcode.app/Contents/Developer';
 }
 // Use a project-scoped toolchain without changing the user's shell configuration.
-for (const rubyBin of ['/opt/homebrew/opt/ruby@3.3/bin', '/usr/local/opt/ruby@3.3/bin']) {
-  if (existsSync(rubyBin)) {
-    env.PATH = `${rubyBin}:${env.PATH || ''}`;
-    break;
+const rubyVersion = spawnSync('ruby', ['-e', 'print RUBY_VERSION'], {env, encoding: 'utf8'});
+const [rubyMajor = 0, rubyMinor = 0] = (rubyVersion.stdout || '').trim().split('.').map(Number);
+if (rubyVersion.status !== 0 || rubyMajor < 3 || (rubyMajor === 3 && rubyMinor < 2)) {
+  for (const rubyBin of ['/opt/homebrew/opt/ruby@3.3/bin', '/usr/local/opt/ruby@3.3/bin']) {
+    if (existsSync(rubyBin)) {
+      env.PATH = `${rubyBin}:${env.PATH || ''}`;
+      break;
+    }
   }
 }
 env.BUNDLE_GEMFILE = path.join(root, 'Gemfile');
@@ -81,7 +85,7 @@ try {
     '-workspace', 'ios/OtaDemo.xcworkspace', '-scheme', 'OtaDemo',
     '-configuration', 'Release', '-sdk', 'iphonesimulator',
     '-destination', 'generic/platform=iOS Simulator',
-    '-derivedDataPath', 'build/ios', '-arch', arch,
+    '-derivedDataPath', 'build/ios', `ARCHS=${arch}`,
     'ONLY_ACTIVE_ARCH=YES', 'CODE_SIGNING_ALLOWED=NO', 'CODE_SIGNING_REQUIRED=NO', 'build',
   ]);
   const builtApp = path.join(root, 'build/ios/Build/Products/Release-iphonesimulator/OtaDemo.app');
