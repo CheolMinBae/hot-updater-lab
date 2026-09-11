@@ -1,0 +1,122 @@
+name: RN demo iOS simulator build and SDK smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_run_id:
+        description: 'Reuse ota-demo-ios-simulator from an earlier run when testing a newer OTA'
+        required: false
+        type: string
+      expected_ota_label:
+        description: 'Download and apply OTA, then assert this label; empty checks the embedded baseline only'
+        required: false
+        type: string
+
+# The public client build and UI test do not need the AWS deployment role.
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: rn-demo-ios-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ios:
+    # Standard macos-15 is Apple Silicon; macos-15-intel is the Intel image.
+    # https://github.com/actions/runner-images/blob/main/images/macos/macos-15-arm64-Readme.md
+    runs-on: macos-15
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: apps/ota-demo
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      IOS_SIMULATOR_ARCH: arm64
+      IOS_SIMULATOR_RUNTIME: com.apple.CoreSimulator.SimRuntime.iOS-18-5
+      EXPECTED_OTA_LABEL: ${{ inputs.expected_ota_label || '' }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Validate the simulator and OTA test inputs
+        env:
+          APP_RUN_ID: ${{ inputs.app_run_id || '' }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import platform
+          run_id = os.environ['APP_RUN_ID']
+          if run_id and not run_id.isdigit():
+              raise SystemExit('app_run_id must be a numeric GitHub Actions run ID')
+          if os.environ['EXPECTED_OTA_LABEL'] and not run_id:
+              raise SystemExit('Set app_run_id to a native build completed before publishing this OTA')
+          if platform.machine() != 'arm64':
+              raise SystemExit('This workflow produces an Apple Silicon simulator app and requires an arm64 runner')
+          PY
+          xcodebuild -version
+          xcrun simctl list runtimes
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/ota-demo/package-lock.json
+      - name: Set up Ruby and the app's CocoaPods dependencies
+        # ruby/setup-ruby v1, pinned to the inspected commit.
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: apps/ota-demo
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test -- --runInBand
+      - name: Build the embedded baseline as a Release simulator app
+        if: ${{ !inputs.app_run_id }}
+        env:
+          IOS_BASELINE_LABEL: Baseline v1
+        run: npm run ios:build:simulator
+      - name: Archive the original app, preserving bundle permissions and symlinks
+        if: ${{ !inputs.app_run_id }}
+        run: |
+          mkdir -p build/ios-artifact
+          tar -czf build/ios-artifact/OtaDemo-simulator-arm64.tar.gz \
+            -C build/ios/Build/Products/Release-iphonesimulator OtaDemo.app
+          (cd build/ios-artifact && shasum -a 256 OtaDemo-simulator-arm64.tar.gz > SHA256SUMS.txt)
+      - name: Save the original app for installation and later OTA checks
+        if: ${{ !inputs.app_run_id }}
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: ota-demo-ios-simulator
+          path: apps/ota-demo/build/ios-artifact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Reuse the app built before the OTA was published
+        if: ${{ inputs.app_run_id }}
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: ota-demo-ios-simulator
+          run-id: ${{ inputs.app_run_id }}
+          github-token: ${{ github.token }}
+          path: apps/ota-demo/build/ios-artifact/
+      - name: Extract the previously built app
+        if: ${{ inputs.app_run_id }}
+        run: |
+          (cd build/ios-artifact && shasum -a 256 -c SHA256SUMS.txt)
+          mkdir -p build/ios/Build/Products/Release-iphonesimulator
+          tar -xzf build/ios-artifact/OtaDemo-simulator-arm64.tar.gz \
+            -C build/ios/Build/Products/Release-iphonesimulator
+      - name: Exercise SDK check, download, apply and relaunch in the simulator
+        run: |
+          python3 e2e/ios/smoke.py \
+            --app build/ios/Build/Products/Release-iphonesimulator/OtaDemo.app \
+            --baseline-label 'Baseline v1' \
+            --expected-ota-label "$EXPECTED_OTA_LABEL"
+      - name: Save screenshots, XCTest results and simulator logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: ota-demo-ios-evidence
+          path: |
+            apps/ota-demo/e2e/artifacts/ios/
+            apps/ota-demo/build/ios-build.log
+          if-no-files-found: warn
+          retention-days: 14
