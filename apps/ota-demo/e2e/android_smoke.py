@@ -72,6 +72,13 @@ def release_label(root):
     )
 
 
+def assert_no_anr(root):
+    for node in root.iter("node"):
+        text = node.get("text", "")
+        if "isn't responding" in text or "isn’t responding" in text or "is not responding" in text:
+            raise AssertionError(f"Android ANR dialog blocks the test: {text}")
+
+
 def scroll(direction):
     size = re.findall(r"(\d+)x(\d+)", adb("shell", "wm", "size"))[-1]
     width, height = map(int, size)
@@ -87,6 +94,7 @@ def wait_for(description, predicate, timeout=90):
     while time.monotonic() < deadline:
         try:
             root = hierarchy()
+            assert_no_anr(root)
             value = predicate(root)
             if value:
                 return value
@@ -138,7 +146,10 @@ def main():
     parser.add_argument("--apk", required=True, type=Path)
     parser.add_argument("--baseline-label", default="", help="Assert this initial label; omitted detects the APK's label")
     parser.add_argument("--expected-ota-label", default="")
+    parser.add_argument("--boot-settle-seconds", type=int, default=0, help="Wait for fresh-emulator provisioning before installing the app")
     args = parser.parse_args()
+    if not 0 <= args.boot_settle_seconds <= 120:
+        parser.error("--boot-settle-seconds must be between 0 and 120")
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
     result = {
         "package": PACKAGE,
@@ -148,10 +159,16 @@ def main():
         "expected_baseline_label": args.baseline_label or None,
         "expected_ota_label": args.expected_ota_label or None,
         "passed": False,
-        "phase": "install",
+        "phase": "emulator-ready",
     }
     try:
         adb("wait-for-device", timeout=120)
+        adb("shell", "input", "keyevent", "KEYCODE_WAKEUP")
+        adb("shell", "wm", "dismiss-keyguard")
+        time.sleep(args.boot_settle_seconds)
+        capture("00-emulator-ready")
+        assert_no_anr(hierarchy())
+        result["phase"] = "install"
         adb("install", "-r", str(args.apk.resolve()), timeout=120)
         adb("shell", "pm", "clear", PACKAGE)
         adb("logcat", "-c")

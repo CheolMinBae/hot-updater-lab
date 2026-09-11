@@ -23,8 +23,7 @@ on:
       - 'apps/ota-demo/metro.config.js'
       - 'apps/ota-demo/tsconfig.json'
       - 'apps/ota-demo/scripts/**'
-      - 'apps/ota-demo/e2e/**'
-      - '.github/workflows/rn-demo-android.yml'
+    # E2E/workflow-only fixes are run manually against an existing APK.
 
 # This workflow builds and exercises a public client. It cannot assume the AWS deployment role.
 permissions:
@@ -111,12 +110,12 @@ jobs:
           api-level: 35
           target: google_apis
           arch: x86_64
-          profile: pixel_7_pro
-          ram-size: 2048M
+          profile: pixel_2
+          ram-size: 3072M
           emulator-boot-timeout: 300
           disable-animations: true
           working-directory: apps/ota-demo
-          script: python3 e2e/android_smoke.py --apk android/app/build/outputs/apk/release/app-release.apk --expected-ota-label "$EXPECTED_OTA_LABEL"
+          script: python3 e2e/android_smoke.py --apk android/app/build/outputs/apk/release/app-release.apk --expected-ota-label "$EXPECTED_OTA_LABEL" --boot-settle-seconds 20
       - name: Save screenshots, UI hierarchy, result and logcat
         if: ${{ always() }}
         uses: actions/upload-artifact@v7.0.1
