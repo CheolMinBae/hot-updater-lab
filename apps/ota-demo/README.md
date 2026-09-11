@@ -137,6 +137,7 @@ iOS도 **RN demo iOS simulator build and SDK smoke**를 `app_run_id=<처음 .app
 - [iOS OTA v2 배포 성공](https://github.com/CheolMinBae/hot-updater-lab/actions/runs/34567358886): 번들 ID `01a08f02-b35c-7a34-9a30-4cf71b75963b`.
 - [같은 .app의 OTA 적용·재실행 유지 성공](https://github.com/CheolMinBae/hot-updater-lab/actions/runs/34567453837): `Baseline v1` 확인 → SDK 다운로드 → 적용 → `OTA v2` 표시 → 종료/재실행 후 유지.
 - Xcode 16.4 / iOS 18.5 / iPhone 16 Pro Max / Apple Silicon 시뮬레이터에서 검증했습니다.
+- 로컬 Xcode 26.6 / iOS 26.5 시뮬레이터에서도 같은 `Baseline v1` 앱 실행과 실제 SDK의 `Update available` 응답을 확인했습니다.
 - `.tar.gz` SHA-256: `d08170cea82e95f6f272747f98d276e47fc1cc30cb107ec26eaef41714b46f55`.
 
 이 결과는 GitHub의 Mac 시뮬레이터에서 수행한 것입니다. 로컬 실행에는 Xcode 초기 설정과 iOS 런타임이 필요합니다. 실제 iPhone 설치·서명, OTA 서명 검증과 장애 롤백은 별도 검증 대상입니다.
